@@ -76,9 +76,20 @@ refactor(core): extract prompt logic into its own module
 ## Flujo de trabajo
 
 - No hagas commits ni push salvo que se pida explicitamente.
+- Nunca hagas commit sin correr los tests antes (`pnpm test`). Todos deben
+  pasar. Si algun cambio toca tipos, corre tambien `pnpm typecheck`.
 - Antes de hacer commit, deja el arbol de trabajo limpio y revisa el diff.
 - Trabaja en ramas con nombre descriptivo cuando aplique: `feat/...`, `fix/...`.
 - No subas secretos, claves ni archivos de configuracion local al repositorio.
+
+## Pruebas
+
+- Framework: vitest. Los tests viven en `test/`.
+- Hay dos niveles: unitarios (funciones puras) e integracion (el cliente contra
+  un binario `claude` falso en `test/fixtures/`, sin red ni autenticacion).
+- Toda funcionalidad nueva debe ir acompanada de pruebas. Apunta a cubrir tanto
+  el camino feliz como los errores.
+- Comandos: `pnpm test` (una pasada) y `pnpm test:watch` (modo continuo).
 
 ## Estructura
 
