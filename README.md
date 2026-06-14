@@ -6,12 +6,45 @@ casos de uso concretos.
 
 ## Estado
 
-En desarrollo inicial. El stack todavia no esta definido.
+En desarrollo inicial.
 
 ## Objetivo
 
 Ofrecer un asistente ligero y especializado sobre la base de Claude Code,
 priorizando la simplicidad y las integraciones a medida frente a la generalidad.
+
+## Stack
+
+- TypeScript (ESM, modo estricto)
+- Node.js >= 20
+- pnpm como gestor de paquetes
+
+## Requisitos
+
+- Node.js 20 o superior
+- pnpm
+
+## Instalacion
+
+```
+pnpm install
+```
+
+## Desarrollo
+
+```
+pnpm dev          # ejecuta el CLI con tsx (sin compilar)
+pnpm typecheck    # valida tipos sin emitir
+pnpm build        # compila a dist/
+pnpm start        # ejecuta la version compilada
+```
+
+Ejemplos:
+
+```
+pnpm dev --help
+pnpm dev --version
+```
 
 ## Convenciones
 
@@ -21,8 +54,5 @@ documentadas en [AGENT.md](AGENT.md). Leelo antes de contribuir.
 Puntos clave:
 
 - Conventional Commits con commits atomicos.
+- Mensajes de commit en ingles.
 - Nunca usar emojis.
-
-## Como empezar
-
-Pendiente de definir cuando se elija el stack.
