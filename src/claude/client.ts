@@ -13,6 +13,8 @@ export interface QueryOptions {
   appendSystemPrompt?: string;
   /** Modo de permisos de la sesion. */
   permissionMode?: "default" | "acceptEdits" | "plan" | "bypassPermissions";
+  /** ID de sesion a reanudar para continuar una conversacion previa. */
+  resume?: string;
   /** Ruta al binario de claude. Por defecto "claude" en el PATH. */
   claudePath?: string;
   /** Permite cancelar la consulta. */
@@ -38,6 +40,7 @@ function buildArgs(prompt: string, options: QueryOptions): string[] {
     "stream-json",
     "--verbose",
   ];
+  if (options.resume) args.push("--resume", options.resume);
   if (options.model) args.push("--model", options.model);
   if (options.permissionMode) {
     args.push("--permission-mode", options.permissionMode);
