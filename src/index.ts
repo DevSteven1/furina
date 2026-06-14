@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { stream, ClaudeError } from "./claude/client.js";
 import type { AssistantEvent, ResultEvent } from "./claude/events.js";
+import { runChat } from "./chat.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +18,9 @@ function getVersion(): string {
 const HELP = `furina - specialized AI assistant built on top of Claude Code
 
 Usage:
-  furina ask <prompt>   Ask the assistant and stream the answer
+  furina                Start an interactive chat session
+  furina chat           Start an interactive chat session
+  furina ask <prompt>   Ask once and stream the answer
   furina <prompt>       Shorthand for "furina ask <prompt>"
 
 Options:
@@ -73,9 +76,14 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  if (values.help || positionals.length === 0) {
+  if (values.help) {
     process.stdout.write(HELP);
-    return values.help ? 0 : 1;
+    return 0;
+  }
+
+  // Sin argumentos o "furina chat" abre el chat interactivo.
+  if (positionals.length === 0 || positionals[0] === "chat") {
+    return runChat();
   }
 
   // Acepta tanto "furina ask <prompt>" como "furina <prompt>".
