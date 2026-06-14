@@ -32,7 +32,7 @@ export class ClaudeError extends Error {
   }
 }
 
-function buildArgs(prompt: string, options: QueryOptions): string[] {
+export function buildArgs(prompt: string, options: QueryOptions = {}): string[] {
   const args = [
     "-p",
     prompt,
