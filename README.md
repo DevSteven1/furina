@@ -91,10 +91,21 @@ furina do "..." --model <id>     # modelo para planner, agentes y sintesis
 furina do "..." --gap 8          # hueco entre ventanas
 furina do "..." --kill           # cierra las ventanas al terminar
 furina do "..." --timeout 300000 # ms maximos de espera por los agentes
+furina do "..." --retries 2      # reintentos por agente fallido (por defecto 1)
 ```
 
 Cada ejecucion deja en `~/.furina/runs/<id>/` el plan (`plan.json`), el
 resultado de cada agente (`agent-N.md`) y la sintesis (`summary.md`).
+
+### Robustez
+
+Un agente puede fallar (error de claude) o expirar (no terminar dentro del
+timeout). Furina distingue ambos casos del exito leyendo el estado que cada
+agente deja en su marca `.done`, y por defecto **relanza una vez** a los que no
+terminaron bien (ajustable con `--retries`, `--retries 0` lo desactiva). Cada
+reintento abre una ventana nueva para ese agente. Si tras los reintentos alguno
+sigue sin terminar bien, la sintesis recibe su resultado marcado como fallido o
+expirado para que lo tenga en cuenta, y el CLI lo informa por stderr.
 
 ## Multi-instancia
 

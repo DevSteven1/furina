@@ -40,6 +40,7 @@ Do options:
   --kill           Close the agent windows when finished
   --background     Do not switch to the furina workspace while agents run
   --timeout <ms>   Max time to wait for all agents (default 600000)
+  --retries <n>    Times to relaunch an agent that failed or timed out (default 1)
 
 Spawn options:
   --prompt <text>  Prompt to run in every instance
@@ -128,6 +129,7 @@ async function runDoCommand(argv: string[]): Promise<number> {
       kill: { type: "boolean" },
       background: { type: "boolean" },
       timeout: { type: "string" },
+      retries: { type: "string" },
     },
     allowPositionals: true,
   });
@@ -150,6 +152,12 @@ async function runDoCommand(argv: string[]): Promise<number> {
     return 1;
   }
 
+  const retries = values.retries !== undefined ? Number(values.retries) : undefined;
+  if (retries !== undefined && (!Number.isInteger(retries) || retries < 0)) {
+    process.stderr.write("Error: --retries must be a non-negative integer\n");
+    return 1;
+  }
+
   try {
     const result = await runDo(task, {
       model: values.model,
@@ -157,6 +165,7 @@ async function runDoCommand(argv: string[]): Promise<number> {
       kill: values.kill,
       watch: !values.background,
       timeoutMs,
+      retries,
       onProgress: (message) => process.stderr.write(`[furina] ${message}\n`),
     });
     if (result.failed.length > 0) {

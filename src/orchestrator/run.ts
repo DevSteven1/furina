@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, access } from "node:fs/promises";
+import { mkdir, readFile, writeFile, access, rm } from "node:fs/promises";
 import { plan } from "./planner.js";
 import { synthesize } from "./synth.js";
 import type { AgentResult } from "./synth.js";
@@ -17,11 +17,14 @@ export interface DoOptions {
   watch?: boolean;
   /** Tiempo maximo (ms) que se espera a que todos los agentes terminen. */
   timeoutMs?: number;
+  /** Veces que se relanza un agente que fallo o expiro (por defecto 1). */
+  retries?: number;
   /** Notifica el progreso (por defecto, nada). */
   onProgress?: (message: string) => void;
 }
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_RETRIES = 1;
 const POLL_INTERVAL_MS = 500;
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -72,23 +75,37 @@ export async function runDo(task: string, options: DoOptions = {}): Promise<DoRe
   const watch = options.watch !== false;
   const origin = watch ? await currentWorkspace() : null;
 
-  await spawnAgents(specs, { model: options.model, gap: options.gap });
-  if (watch) {
-    progress("Llevandote al workspace de furina para ver a los agentes...");
-    await showWorkspace();
-  }
-
   const indices = agents.map((_, i) => i + 1);
-  progress("Esperando a que los agentes terminen...");
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const timedOut = await waitForAgents(dir, indices, timeoutMs);
+  const maxRetries = options.retries ?? DEFAULT_RETRIES;
+  // Estado final conocido de cada agente; se va refinando ronda a ronda.
+  const statuses: AgentStatus[] = indices.map(() => "timeout");
+
+  // En cada ronda (re)lanzamos solo los agentes que aun no han terminado bien.
+  let pending = indices;
+  for (let round = 0; ; round++) {
+    if (round > 0) {
+      progress(`Reintentando ${pending.length} agente(s) (intento ${round + 1})...`);
+      await clearMarkers(dir, pending);
+    }
+    await spawnAgents(pending.map((i) => specs[i - 1]!), { model: options.model, gap: options.gap });
+    if (round === 0 && watch) {
+      progress("Llevandote al workspace de furina para ver a los agentes...");
+      await showWorkspace();
+    }
+
+    progress("Esperando a que los agentes terminen...");
+    const timedOut = await waitForAgents(dir, pending, timeoutMs);
+    for (const i of pending) {
+      statuses[i - 1] = await readAgentStatus(dir, i, timedOut.includes(i));
+    }
+
+    const toRetry = retryable(statuses);
+    if (toRetry.length === 0 || round >= maxRetries) break;
+    pending = toRetry;
+  }
 
   if (origin) await focusWorkspaceRef(origin);
-
-  const statuses: AgentStatus[] = [];
-  for (const i of indices) {
-    statuses.push(await readAgentStatus(dir, i, timedOut.includes(i)));
-  }
 
   const results: AgentResult[] = [];
   for (let i = 0; i < agents.length; i++) {
@@ -117,6 +134,26 @@ export async function runDo(task: string, options: DoOptions = {}): Promise<DoRe
     timedOut: indices.filter((i) => statuses[i - 1] === "timeout"),
     failed: indices.filter((i) => statuses[i - 1] === "error"),
   };
+}
+
+/**
+ * Indices (1-based) de los agentes que conviene reintentar: los que no
+ * terminaron bien (error o timeout). Sobre el estado global, equivale a los que
+ * siguen pendientes tras la ultima ronda.
+ */
+export function retryable(statuses: AgentStatus[]): number[] {
+  return statuses
+    .map((status, i) => ({ status, index: i + 1 }))
+    .filter(({ status }) => status !== "ok")
+    .map(({ index }) => index);
+}
+
+/** Borra el resultado y la marca `.done` de unos agentes antes de relanzarlos. */
+async function clearMarkers(dir: string, indices: number[]): Promise<void> {
+  for (const i of indices) {
+    await rm(agentResultPath(dir, i), { force: true });
+    await rm(agentDonePath(dir, i), { force: true });
+  }
 }
 
 /** Clasifica como termino un agente leyendo su marca `.done` (o timeout si falta). */
