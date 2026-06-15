@@ -152,11 +152,21 @@ export async function killInstances(): Promise<number> {
     remaining = await countWorkers();
   }
 
-  await evalLua(focusWorkspaceSelectorLua(workspaceSelector(origin)));
+  await focusWorkspaceRef(origin);
   return before - remaining;
 }
 
 /** Cambia la vista al workspace dedicado para ver las instancias. */
 export async function showWorkspace(): Promise<void> {
   await evalLua(focusWorkspaceLua(WORKSPACE));
+}
+
+/** Workspace que el monitor con foco esta mostrando ahora mismo. */
+export async function currentWorkspace(): Promise<HyprWorkspaceRef> {
+  return (await getFocusedMonitor()).activeWorkspace;
+}
+
+/** Devuelve la vista a un workspace concreto (p. ej. donde estaba el usuario). */
+export async function focusWorkspaceRef(ws: HyprWorkspaceRef): Promise<void> {
+  await evalLua(focusWorkspaceSelectorLua(workspaceSelector(ws)));
 }

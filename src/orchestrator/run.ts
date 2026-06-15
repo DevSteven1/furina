@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import { plan } from "./planner.js";
 import { synthesize } from "./synth.js";
 import type { AgentResult } from "./synth.js";
-import { spawnAgents, killInstances } from "./manager.js";
+import { spawnAgents, killInstances, showWorkspace, currentWorkspace, focusWorkspaceRef } from "./manager.js";
 import { runDir, agentResultPath, agentDonePath, planPath, summaryPath } from "./runs.js";
 
 export interface DoOptions {
@@ -10,6 +10,8 @@ export interface DoOptions {
   gap?: number;
   /** Cierra las ventanas de los agentes al terminar. */
   kill?: boolean;
+  /** Lleva la vista al workspace de furina mientras trabajan (por defecto si). */
+  watch?: boolean;
   /** Tiempo maximo (ms) que se espera a que todos los agentes terminen. */
   timeoutMs?: number;
   /** Notifica el progreso (por defecto, nada). */
@@ -59,10 +61,22 @@ export async function runDo(task: string, options: DoOptions = {}): Promise<DoRe
     prompt: agent.prompt,
     out: agentResultPath(dir, i + 1),
   }));
+
+  // Recordamos donde esta el usuario para llevarlo a ver a los agentes y, al
+  // terminar, devolverlo a su sitio (donde se imprime la sintesis).
+  const watch = options.watch !== false;
+  const origin = watch ? await currentWorkspace() : null;
+
   await spawnAgents(specs, { model: options.model, gap: options.gap });
+  if (watch) {
+    progress("Llevandote al workspace de furina para ver a los agentes...");
+    await showWorkspace();
+  }
 
   progress("Esperando a que los agentes terminen...");
   const timedOut = await waitForAgents(dir, agents.length, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+  if (origin) await focusWorkspaceRef(origin);
 
   const results: AgentResult[] = [];
   for (let i = 0; i < agents.length; i++) {
