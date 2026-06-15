@@ -38,12 +38,14 @@ Do options:
   --model <id>     Model to use for the planner, agents and synthesis
   --gap <px>       Gap in pixels between windows (default 12)
   --kill           Close the agent windows when finished
+  --background     Do not switch to the furina workspace while agents run
   --timeout <ms>   Max time to wait for all agents (default 600000)
 
 Spawn options:
   --prompt <text>  Prompt to run in every instance
   --model <id>     Model to use in every instance
   --gap <px>       Gap in pixels between windows (default 12)
+  --background     Do not switch to the furina workspace after spawning
 `;
 
 /** Ejecuta una consulta y escribe la respuesta del asistente en stdout. */
@@ -87,6 +89,7 @@ async function runSpawn(argv: string[]): Promise<number> {
       prompt: { type: "string" },
       model: { type: "string" },
       gap: { type: "string" },
+      background: { type: "boolean" },
     },
     allowPositionals: true,
   });
@@ -105,13 +108,13 @@ async function runSpawn(argv: string[]): Promise<number> {
 
   try {
     await spawnInstances(count, { prompt: values.prompt, model: values.model, gap });
+    if (!values.background) await showWorkspace();
   } catch (error) {
     process.stderr.write(`Error: ${(error as Error).message}\n`);
     return 1;
   }
-  process.stdout.write(
-    `Spawned ${count} instance(s) in workspace "${WORKSPACE}". Run "furina show" to watch them.\n`,
-  );
+  const hint = values.background ? ' Run "furina show" to watch them.' : "";
+  process.stdout.write(`Spawned ${count} instance(s) in workspace "${WORKSPACE}".${hint}\n`);
   return 0;
 }
 
@@ -123,6 +126,7 @@ async function runDoCommand(argv: string[]): Promise<number> {
       model: { type: "string" },
       gap: { type: "string" },
       kill: { type: "boolean" },
+      background: { type: "boolean" },
       timeout: { type: "string" },
     },
     allowPositionals: true,
@@ -151,6 +155,7 @@ async function runDoCommand(argv: string[]): Promise<number> {
       model: values.model,
       gap,
       kill: values.kill,
+      watch: !values.background,
       timeoutMs,
       onProgress: (message) => process.stderr.write(`[furina] ${message}\n`),
     });
