@@ -6,6 +6,8 @@ import { dirname, join } from "node:path";
 import { stream, ClaudeError } from "./claude/client.js";
 import type { AssistantEvent, ResultEvent } from "./claude/events.js";
 import { runChat } from "./chat.js";
+import { runWorker } from "./worker.js";
+import { spawnInstances, killInstances, showWorkspace, WORKSPACE } from "./orchestrator/manager.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,14 +20,22 @@ function getVersion(): string {
 const HELP = `furina - specialized AI assistant built on top of Claude Code
 
 Usage:
-  furina                Start an interactive chat session
-  furina chat           Start an interactive chat session
-  furina ask <prompt>   Ask once and stream the answer
-  furina <prompt>       Shorthand for "furina ask <prompt>"
+  furina                  Start an interactive chat session
+  furina chat             Start an interactive chat session
+  furina ask <prompt>     Ask once and stream the answer
+  furina <prompt>         Shorthand for "furina ask <prompt>"
+  furina spawn <n>        Open n claude instances in a dedicated workspace
+  furina show             Switch to the furina workspace to watch the instances
+  furina kill             Close every furina-managed window
 
 Options:
   -h, --help     Show this help message
   -v, --version  Show the version
+
+Spawn options:
+  --prompt <text>  Prompt to run in every instance
+  --model <id>     Model to use in every instance
+  --gap <px>       Gap in pixels between windows (default 12)
 `;
 
 /** Ejecuta una consulta y escribe la respuesta del asistente en stdout. */
@@ -61,7 +71,66 @@ async function runAsk(prompt: string): Promise<number> {
   return 0;
 }
 
+/** Abre n instancias de claude, cada una en su propia ventana. */
+async function runSpawn(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    options: {
+      prompt: { type: "string" },
+      model: { type: "string" },
+      gap: { type: "string" },
+    },
+    allowPositionals: true,
+  });
+
+  const count = Number(positionals[0]);
+  if (!Number.isInteger(count) || count < 1) {
+    process.stderr.write("Error: spawn requires a positive integer count\n");
+    return 1;
+  }
+
+  const gap = values.gap !== undefined ? Number(values.gap) : undefined;
+  if (gap !== undefined && (!Number.isFinite(gap) || gap < 0)) {
+    process.stderr.write("Error: --gap must be a non-negative number\n");
+    return 1;
+  }
+
+  try {
+    await spawnInstances(count, { prompt: values.prompt, model: values.model, gap });
+  } catch (error) {
+    process.stderr.write(`Error: ${(error as Error).message}\n`);
+    return 1;
+  }
+  process.stdout.write(
+    `Spawned ${count} instance(s) in workspace "${WORKSPACE}". Run "furina show" to watch them.\n`,
+  );
+  return 0;
+}
+
 async function main(argv: string[]): Promise<number> {
+  // Subcomandos con sus propias opciones: se enrutan antes del parseo general.
+  if (argv[0] === "worker") return runWorker(argv.slice(1));
+  if (argv[0] === "spawn") return runSpawn(argv.slice(1));
+  if (argv[0] === "show") {
+    try {
+      await showWorkspace();
+    } catch (error) {
+      process.stderr.write(`Error: ${(error as Error).message}\n`);
+      return 1;
+    }
+    return 0;
+  }
+  if (argv[0] === "kill") {
+    try {
+      const closed = await killInstances();
+      process.stdout.write(`Closed ${closed} furina window(s).\n`);
+    } catch (error) {
+      process.stderr.write(`Error: ${(error as Error).message}\n`);
+      return 1;
+    }
+    return 0;
+  }
+
   const { values, positionals } = parseArgs({
     args: argv,
     options: {
