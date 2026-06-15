@@ -32,3 +32,23 @@ export function planPath(dir: string): string {
 export function summaryPath(dir: string): string {
   return join(dir, "summary.md");
 }
+
+/** Estado que un agente deja escrito dentro de su marcador `.done`. */
+export type DoneStatus = "ok" | "error";
+
+const DONE_OK = "ok";
+const DONE_ERROR = "error";
+
+/**
+ * Texto que el worker escribe en el marcador `.done` segun como termino. El
+ * orquestador lo interpreta con `parseDoneMarker`; ambos viven aqui para no
+ * desincronizarse, igual que la convencion del propio nombre `.done`.
+ */
+export function doneMarker(ok: boolean): string {
+  return ok ? DONE_OK : DONE_ERROR;
+}
+
+/** Interpreta el contenido de un marcador `.done`. Vacio cuenta como ok (compat). */
+export function parseDoneMarker(raw: string): DoneStatus {
+  return raw.trim() === DONE_ERROR ? "error" : "ok";
+}

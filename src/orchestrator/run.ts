@@ -3,7 +3,10 @@ import { plan } from "./planner.js";
 import { synthesize } from "./synth.js";
 import type { AgentResult } from "./synth.js";
 import { spawnAgents, killInstances, showWorkspace, currentWorkspace, focusWorkspaceRef } from "./manager.js";
-import { runDir, agentResultPath, agentDonePath, planPath, summaryPath } from "./runs.js";
+import { runDir, agentResultPath, agentDonePath, planPath, summaryPath, parseDoneMarker } from "./runs.js";
+
+/** Como termino un agente: bien, con error, o sin terminar a tiempo. */
+export type AgentStatus = "ok" | "error" | "timeout";
 
 export interface DoOptions {
   model?: string;
@@ -38,6 +41,8 @@ export interface DoResult {
   summary: string;
   /** Indices (1-based) de agentes que no llegaron a terminar a tiempo. */
   timedOut: number[];
+  /** Indices (1-based) de agentes que terminaron con error. */
+  failed: number[];
 }
 
 /**
@@ -73,16 +78,27 @@ export async function runDo(task: string, options: DoOptions = {}): Promise<DoRe
     await showWorkspace();
   }
 
+  const indices = agents.map((_, i) => i + 1);
   progress("Esperando a que los agentes terminen...");
-  const timedOut = await waitForAgents(dir, agents.length, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timedOut = await waitForAgents(dir, indices, timeoutMs);
 
   if (origin) await focusWorkspaceRef(origin);
 
+  const statuses: AgentStatus[] = [];
+  for (const i of indices) {
+    statuses.push(await readAgentStatus(dir, i, timedOut.includes(i)));
+  }
+
   const results: AgentResult[] = [];
   for (let i = 0; i < agents.length; i++) {
+    const status = statuses[i]!;
     const path = agentResultPath(dir, i + 1);
-    const content = (await exists(path)) ? await readFile(path, "utf8") : "[sin resultado: el agente no termino a tiempo]";
-    results.push({ title: agents[i]!.title, content });
+    const content =
+      status === "timeout"
+        ? "[sin resultado: el agente no termino a tiempo]"
+        : await readFile(path, "utf8");
+    results.push({ title: agents[i]!.title, content, status });
   }
 
   progress("Sintetizando la respuesta final...");
@@ -94,23 +110,41 @@ export async function runDo(task: string, options: DoOptions = {}): Promise<DoRe
     await killInstances();
   }
 
-  return { runId, dir, summary, timedOut };
+  return {
+    runId,
+    dir,
+    summary,
+    timedOut: indices.filter((i) => statuses[i - 1] === "timeout"),
+    failed: indices.filter((i) => statuses[i - 1] === "error"),
+  };
 }
 
-/** Espera a que aparezca la marca `.done` de cada agente, hasta el timeout. */
-async function waitForAgents(dir: string, count: number, timeoutMs: number): Promise<number[]> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+/** Clasifica como termino un agente leyendo su marca `.done` (o timeout si falta). */
+async function readAgentStatus(dir: string, index: number, timedOut: boolean): Promise<AgentStatus> {
+  if (timedOut) return "timeout";
+  const donePath = agentDonePath(dir, index);
+  if (!(await exists(donePath))) return "timeout";
+  return parseDoneMarker(await readFile(donePath, "utf8"));
+}
+
+/**
+ * Espera a que aparezca la marca `.done` de los agentes dados, hasta el timeout.
+ * Devuelve los indices que seguian sin terminar al agotarse el tiempo.
+ */
+async function waitForAgents(dir: string, indices: number[], timeoutMs: number): Promise<number[]> {
+  const pendingNow = async (): Promise<number[]> => {
     const pending: number[] = [];
-    for (let i = 1; i <= count; i++) {
+    for (const i of indices) {
       if (!(await exists(agentDonePath(dir, i)))) pending.push(i);
     }
+    return pending;
+  };
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pending = await pendingNow();
     if (pending.length === 0) return [];
     await delay(POLL_INTERVAL_MS);
   }
-  const stillPending: number[] = [];
-  for (let i = 1; i <= count; i++) {
-    if (!(await exists(agentDonePath(dir, i)))) stillPending.push(i);
-  }
-  return stillPending;
+  return pendingNow();
 }

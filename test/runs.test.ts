@@ -8,6 +8,8 @@ import {
   agentDonePath,
   planPath,
   summaryPath,
+  doneMarker,
+  parseDoneMarker,
 } from "../src/orchestrator/runs.js";
 
 describe("run paths", () => {
@@ -29,5 +31,27 @@ describe("run paths", () => {
     // worker se desincronicen como paso en la primera prueba real.
     const dir = runDir("abc");
     expect(agentDonePath(dir, 3)).toBe(`${agentResultPath(dir, 3)}.done`);
+  });
+});
+
+describe("done marker status", () => {
+  it("writes ok or error depending on how the agent finished", () => {
+    expect(doneMarker(true)).toBe("ok");
+    expect(doneMarker(false)).toBe("error");
+  });
+
+  it("parses the marker back into a status", () => {
+    expect(parseDoneMarker("ok")).toBe("ok");
+    expect(parseDoneMarker("error")).toBe("error");
+    expect(parseDoneMarker("  error\n")).toBe("error");
+  });
+
+  it("treats an empty marker as ok for backward compatibility", () => {
+    expect(parseDoneMarker("")).toBe("ok");
+  });
+
+  it("round-trips writer and reader", () => {
+    expect(parseDoneMarker(doneMarker(true))).toBe("ok");
+    expect(parseDoneMarker(doneMarker(false))).toBe("error");
   });
 });

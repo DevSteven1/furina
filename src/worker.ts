@@ -4,6 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stream, ClaudeError } from "./claude/client.js";
 import type { AssistantEvent, ResultEvent } from "./claude/events.js";
+import { doneMarker } from "./orchestrator/runs.js";
 
 /** Espera a que el usuario pulse Enter para no cerrar la ventana al instante. */
 async function waitForEnter(): Promise<void> {
@@ -17,10 +18,14 @@ async function waitForEnter(): Promise<void> {
   }
 }
 
-/** Vuelca el resultado al archivo de salida y crea la marca `.done`. */
-async function report(out: string, content: string): Promise<void> {
+/**
+ * Vuelca el resultado al archivo de salida y crea la marca `.done` con el estado
+ * (`ok`/`error`) para que el orquestador distinga un agente que termino bien de
+ * uno que fallo, sin tener que adivinar a partir del contenido.
+ */
+export async function report(out: string, content: string, ok: boolean): Promise<void> {
   await writeFile(out, content, "utf8");
-  await writeFile(`${out}.done`, "", "utf8");
+  await writeFile(`${out}.done`, doneMarker(ok), "utf8");
 }
 
 /**
@@ -81,7 +86,7 @@ export async function runWorker(argv: string[]): Promise<number> {
     }
   } finally {
     // Pase lo que pase, dejamos constancia para no colgar al orquestador.
-    if (out) await report(out, failed ? `[ERROR]\n${collected}` : collected);
+    if (out) await report(out, failed ? `[ERROR]\n${collected}` : collected, !failed);
   }
 
   stdout.write("\n\n\x1b[2m[furina] instancia terminada. Pulsa Enter para cerrar.\x1b[0m");

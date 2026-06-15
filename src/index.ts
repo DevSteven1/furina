@@ -159,6 +159,9 @@ async function runDoCommand(argv: string[]): Promise<number> {
       timeoutMs,
       onProgress: (message) => process.stderr.write(`[furina] ${message}\n`),
     });
+    if (result.failed.length > 0) {
+      process.stderr.write(`[furina] agentes con error: ${result.failed.join(", ")}\n`);
+    }
     if (result.timedOut.length > 0) {
       process.stderr.write(`[furina] agentes sin terminar: ${result.timedOut.join(", ")}\n`);
     }
