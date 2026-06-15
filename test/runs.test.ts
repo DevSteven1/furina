@@ -1,0 +1,33 @@
+import { describe, it, expect } from "vitest";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import {
+  FURINA_HOME,
+  runDir,
+  agentResultPath,
+  agentDonePath,
+  planPath,
+  summaryPath,
+} from "../src/orchestrator/runs.js";
+
+describe("run paths", () => {
+  it("roots everything under ~/.furina", () => {
+    expect(FURINA_HOME).toBe(join(homedir(), ".furina"));
+  });
+
+  it("builds per-run artifact paths", () => {
+    const dir = runDir("abc");
+    expect(dir).toBe(join(FURINA_HOME, "runs", "abc"));
+    expect(agentResultPath(dir, 2)).toBe(join(dir, "agent-2.md"));
+    expect(agentDonePath(dir, 2)).toBe(join(dir, "agent-2.md.done"));
+    expect(planPath(dir)).toBe(join(dir, "plan.json"));
+    expect(summaryPath(dir)).toBe(join(dir, "summary.md"));
+  });
+
+  it("keeps the done marker as the result path plus .done", () => {
+    // El worker escribe `${out}.done`; esta igualdad evita que orquestador y
+    // worker se desincronicen como paso en la primera prueba real.
+    const dir = runDir("abc");
+    expect(agentDonePath(dir, 3)).toBe(`${agentResultPath(dir, 3)}.done`);
+  });
+});
