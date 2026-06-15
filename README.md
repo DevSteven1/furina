@@ -66,11 +66,41 @@ pnpm dev ask "explicame que es furina"
 pnpm dev "atajo equivalente a ask"
 ```
 
+## Orquestacion
+
+El modo principal: le das una tarea de alto nivel y furina decide como dividirla
+en agentes que trabajan en paralelo, recoge sus resultados y los sintetiza en una
+respuesta final.
+
+```
+furina do "investiga X, compara Y y escribe un resumen"
+```
+
+El flujo es:
+
+1. **Planifica**: claude divide la tarea en subtareas (un agente por subtarea).
+2. **Reparte**: lanza un agente por subtarea, cada uno en su ventana.
+3. **Recoge**: cada agente vuelca su resultado en `~/.furina/runs/<id>/`.
+4. **Sintetiza**: claude junta los resultados en una respuesta final unificada,
+   que se imprime y se guarda en `summary.md`.
+
+Opciones:
+
+```
+furina do "..." --model <id>     # modelo para planner, agentes y sintesis
+furina do "..." --gap 8          # hueco entre ventanas
+furina do "..." --kill           # cierra las ventanas al terminar
+furina do "..." --timeout 300000 # ms maximos de espera por los agentes
+```
+
+Cada ejecucion deja en `~/.furina/runs/<id>/` el plan (`plan.json`), el
+resultado de cada agente (`agent-N.md`) y la sintesis (`summary.md`).
+
 ## Multi-instancia
 
-Furina puede abrir varias instancias de claude a la vez, cada una en su propia
-ventana, repartidas en rejilla sobre un workspace dedicado (`furina`) sin tocar
-el que estas usando.
+A bajo nivel, furina tambien permite abrir varias instancias de claude a mano,
+cada una en su propia ventana, repartidas en rejilla sobre un workspace dedicado
+(`furina`) sin tocar el que estas usando.
 
 ```
 furina spawn 4                       # abre 4 instancias en el workspace furina

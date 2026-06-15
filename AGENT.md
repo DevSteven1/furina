@@ -105,7 +105,10 @@ refactor(core): extract prompt logic into its own module
 - `src/worker.ts`: punto de entrada de una instancia individual (corre un prompt
   y vuelca la respuesta en su ventana).
 - `src/self.ts`: calcula como relanzar furina (dev con tsx o binario compilado).
-- `src/orchestrator/`: orquesta el spawn, show y kill de las instancias.
+- `src/orchestrator/`: el cerebro. `planner.ts` divide la tarea en agentes,
+  `synth.ts` sintetiza los resultados, `run.ts` encadena el flujo `do`
+  (planificar -> repartir -> recoger -> sintetizar), `runs.ts` define las rutas
+  de `~/.furina/runs/<id>/` y `manager.ts` orquesta spawn, show y kill.
 - `src/window/`: calculo de la rejilla (`grid.ts`, logica pura) y apertura de
   ventanas de kitty (`spawn.ts`).
 - `src/hypr/`: cliente de Hyprland (`client.ts`) y generacion del Lua de reglas
