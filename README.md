@@ -111,8 +111,13 @@ furina kill                          # cierra todas las ventanas de furina
 ```
 
 El workspace `furina` es un workspace *named*, no uno numerado: tus atajos
-habituales (Super+1, Super+2...) van a los numerados y no llegan a el. Para verlo
-usa `furina show`, o crea un bind que enfoque `name:furina`.
+habituales (Super+1, Super+2...) van a los numerados y no llegan a el. Por eso,
+por defecto, `furina do` y `furina spawn` te llevan al workspace para que veas a
+los agentes trabajar (`do` te devuelve a tu sitio al terminar). Usa
+`--background` para no cambiar de vista, y `furina show` para ir cuando quieras.
+
+Si prefieres llegar a mano, anade a tu config de Hyprland un bind que enfoque
+`name:furina` (los binds van en Lua en 0.55+).
 
 `kill` solo cierra ventanas creadas por furina (clase `furina-worker-*`). Nunca
 toca tu terminal, tu sesion de Claude Code ni ninguna otra ventana: antes de
