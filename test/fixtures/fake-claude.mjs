@@ -23,9 +23,15 @@ if (prompt.includes("CRASH")) {
 
 const sessionId = resume ?? "test-session-0001";
 const isError = prompt.includes("FAIL");
-const text = isError
-  ? "Not logged in"
-  : `echo:${prompt}${resume ? `|resumed:${resume}` : ""}`;
+
+let text;
+if (isError) {
+  text = "Not logged in";
+} else if (prompt.includes("PLAN_OK")) {
+  text = '{"agents":[{"title":"A","prompt":"do a"},{"title":"B","prompt":"do b"}]}';
+} else {
+  text = `echo:${prompt}${resume ? `|resumed:${resume}` : ""}`;
+}
 
 function emit(obj) {
   process.stdout.write(`${JSON.stringify(obj)}\n`);
