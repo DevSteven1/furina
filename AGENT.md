@@ -9,8 +9,13 @@ Furina es un asistente de IA especializado. Por debajo se apoya en Claude Code
 CLI, pero su objetivo es ofrecer algo mas sencillo y enfocado, con capacidades de
 integracion especificas para casos de uso concretos.
 
-El stack todavia no esta decidido. No asumas un lenguaje ni un framework: si una
-tarea lo requiere, pregunta antes de introducir dependencias o estructura nueva.
+El stack es TypeScript (ESM, modo estricto) sobre Node.js >= 20, con pnpm como
+gestor. No introduzcas dependencias ni un cambio de estructura grande sin
+preguntar antes.
+
+El modo multi-instancia integra con el entorno de escritorio: Hyprland (control
+de ventanas via su API Lua, `hyprctl eval`) y kitty como terminal. Esa
+integracion es especifica de ese entorno; no la asumas presente en los tests.
 
 ## Reglas de estilo
 
@@ -93,5 +98,19 @@ refactor(core): extract prompt logic into its own module
 
 ## Estructura
 
-La estructura se ira definiendo conforme crezca el proyecto. Cuando se decida el
-stack, documenta aqui las carpetas principales y como ejecutar el proyecto.
+- `src/index.ts`: punto de entrada del CLI y enrutado de subcomandos.
+- `src/chat.ts`: chat interactivo con memoria de sesion.
+- `src/claude/`: cliente que invoca Claude Code en modo stream-json y sus tipos
+  de evento.
+- `src/worker.ts`: punto de entrada de una instancia individual (corre un prompt
+  y vuelca la respuesta en su ventana).
+- `src/self.ts`: calcula como relanzar furina (dev con tsx o binario compilado).
+- `src/orchestrator/`: orquesta el spawn, show y kill de las instancias.
+- `src/window/`: calculo de la rejilla (`grid.ts`, logica pura) y apertura de
+  ventanas de kitty (`spawn.ts`).
+- `src/hypr/`: cliente de Hyprland (`client.ts`) y generacion del Lua de reglas
+  y dispatch (`rules.ts`).
+- `test/`: pruebas con vitest (unitarias e integracion).
+
+Como ejecutar: ver [README.md](README.md) (`pnpm dev`, `pnpm build`,
+`pnpm test`).
