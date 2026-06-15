@@ -32,37 +32,84 @@ function makeRunId(): string {
   return Date.now().toString(36).slice(-5);
 }
 
+/** Una ventana a abrir: su titulo y los argumentos con que se relanza furina. */
+export interface PlannedWindow {
+  title: string;
+  workerArgs: string[];
+}
+
 /**
- * Lanza `count` instancias de claude, cada una en su ventana, repartidas en
- * rejilla sobre el workspace dedicado, sin tocar el workspace actual.
+ * Reparte las ventanas dadas en rejilla sobre el workspace dedicado, sin tocar
+ * el workspace actual. Cada una se relanza como `furina <workerArgs>`.
  */
-export async function spawnInstances(count: number, options: SpawnOptions = {}): Promise<void> {
+export async function spawnGrid(windows: PlannedWindow[], gap?: number): Promise<void> {
   const monitor = await getFocusedMonitor();
   const area = usableArea(monitor);
-  const rects = computeGrid(area, count, options.gap ?? DEFAULT_GAP);
+  const rects = computeGrid(area, windows.length, gap ?? DEFAULT_GAP);
   const runId = makeRunId();
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < windows.length; i++) {
     const rect = rects[i];
-    if (!rect) continue;
+    const win = windows[i];
+    if (!rect || !win) continue;
 
-    const id = i + 1;
-    const cls = `${WORKER_CLASS_PREFIX}${runId}-${id}`;
-    const prompt = options.prompt ?? `Eres la instancia ${id} de ${count}. Saluda en una frase breve.`;
-
-    const workerArgs = ["worker", "--id", String(id), "--prompt", prompt];
-    if (options.model) workerArgs.push("--model", options.model);
-    const self = selfCommand(workerArgs);
+    const cls = `${WORKER_CLASS_PREFIX}${runId}-${i + 1}`;
+    const self = selfCommand(win.workerArgs);
 
     await spawnWindow({
       cls,
-      title: `furina #${id}`,
+      title: win.title,
       rect,
       workspace: WORKSPACE,
       command: self.command,
       cwd: self.cwd,
     });
   }
+}
+
+/**
+ * Lanza `count` instancias de claude, cada una en su ventana, repartidas en
+ * rejilla sobre el workspace dedicado, sin tocar el workspace actual.
+ */
+export async function spawnInstances(count: number, options: SpawnOptions = {}): Promise<void> {
+  const windows: PlannedWindow[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = i + 1;
+    const prompt = options.prompt ?? `Eres la instancia ${id} de ${count}. Saluda en una frase breve.`;
+    const workerArgs = ["worker", "--id", String(id), "--prompt", prompt];
+    if (options.model) workerArgs.push("--model", options.model);
+    windows.push({ title: `furina #${id}`, workerArgs });
+  }
+  await spawnGrid(windows, options.gap);
+}
+
+/** Un agente a lanzar: su subtarea y el archivo donde volcara el resultado. */
+export interface AgentSpawn {
+  title: string;
+  prompt: string;
+  /** Ruta donde el worker escribira su resultado. */
+  out: string;
+}
+
+/** Lanza un agente por subtarea, cada uno en su ventana, con su archivo de salida. */
+export async function spawnAgents(
+  agents: AgentSpawn[],
+  options: { model?: string; gap?: number } = {},
+): Promise<void> {
+  const windows: PlannedWindow[] = agents.map((agent, i) => {
+    const workerArgs = [
+      "worker",
+      "--id",
+      String(i + 1),
+      "--prompt",
+      agent.prompt,
+      "--out",
+      agent.out,
+    ];
+    if (options.model) workerArgs.push("--model", options.model);
+    return { title: agent.title, workerArgs };
+  });
+  await spawnGrid(windows, options.gap);
 }
 
 /** Cuantas ventanas gestionadas por furina siguen abiertas. */
